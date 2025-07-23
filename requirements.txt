@@ -1,0 +1,11 @@
+requests
+google-auth-httplib2
+PyPDF2
+pytz
+tableauserverclient
+google-api-python-client
+google-auth
+unidecode
+google-auth-oauthlib
+pandas
+keboola.component
