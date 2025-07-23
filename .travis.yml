@@ -1,0 +1,20 @@
+sudo: required
+language: bash
+services:
+  - docker
+
+before_script:
+  # název lokálního image
+  - export APP_IMAGE=tableau-subscription
+  # postavíme image
+  - docker build . --tag=$APP_IMAGE
+
+after_success:
+  - docker images
+
+deploy:
+  provider: script
+  skip_cleanup: true
+  script: ./deploy.sh
+  on:
+    tags: true
