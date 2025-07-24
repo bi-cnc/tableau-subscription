@@ -3,10 +3,13 @@ set -ex
 
 echo "Starting deploy script..."
 
-# **OPRAVENÝ KROK:** Instalace keboola-developer-portal-cli (správný název balíčku)
-echo "Installing keboola-developer-portal..."
-pip install keboola-developer-portal || { echo "Failed to install keboola-developer-portal."; exit 1; }
-echo "keboola-developer-portal installed successfully."
+# Tento krok s instalací PIP balíčku byl zdrojem chyby.
+# Keboola Developer Portal CLI je nainstalován jako Ruby gem pomocí 'dpl',
+# takže tento řádek je nepotřebný a způsobuje problém.
+# echo "Installing keboola-developer-portal..."
+# pip install keboola-developer-portal || { echo "Failed to install keboola-developer-portal."; exit 1; }
+# echo "keboola-developer-portal installed successfully."
+
 
 # 1. Získání informací o repozitáři a ECR přihlašovacích údajů do lokálního souboru
 echo "Obtaining repository info and ECR credentials..."
