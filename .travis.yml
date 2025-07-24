@@ -1,26 +1,28 @@
-sudo: required
-language: bash
+dist: focal
+language: python
+python:
+  - "3.9"   # Travis default je starý 3.7, proto radši 3.9
+
 services:
   - docker
 
+env:
+  global:
+    - APP_IMAGE=keboola-component
+
+before_install:
+  # Upgrade pipu, setuptools a wheel, aby zvládly instalaci z GitHubu
+  - python3 -m pip install --upgrade pip setuptools wheel
+
 before_script:
-  - export APP_IMAGE=keboola-component
+  # Build Docker image
   - docker build . --tag=$APP_IMAGE
 
-after_success:
+script:
   - docker images
 
 deploy:
-  # Dočasně změníme provider na "after_deploy" pro maximální kontrolu a ladění.
-  # Tento krok bude spuštěn místo standardního deploy provideru.
-  # Po nalezení chyby a nasazení komponenty bychom se vrátili k "provider: script".
-  provider: script # Stále je to script provider, ale upravíme, jak se spouští.
-  skip_cleanup: true
-  # Změna: Místo "script: ./deploy.sh" provedeme explicitní spuštění s debugováním.
-  script: |
-    echo "--- Debugging deploy.sh ---"
-    chmod +x ./deploy.sh # Zajistíme spustitelná práva
-    bash -e -x ./deploy.sh # Explicitně spustíme s debugem a chybovým ukončením
-    echo "--- Debugging deploy.sh Finished ---"
+  provider: script
+  script: bash ./deploy.sh
   on:
     tags: true
