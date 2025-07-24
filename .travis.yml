@@ -1,28 +1,20 @@
-dist: focal
-language: python
-python:
-  - "3.9"   # Travis default je starý 3.7, proto radši 3.9
-
+sudo: false
 services:
   - docker
 
-env:
-  global:
-    - APP_IMAGE=keboola-component
-
-before_install:
-  # Upgrade pipu, setuptools a wheel, aby zvládly instalaci z GitHubu
-  - python3 -m pip install --upgrade pip setuptools wheel
-
 before_script:
-  # Build Docker image
-  - docker build . --tag=$APP_IMAGE
+  - export APP_IMAGE=keboola-component
+  - docker build -t $APP_IMAGE .
+  # případně testování:
+  # - docker run $APP_IMAGE flake8
+  # - docker run $APP_IMAGE python -m unittest discover
 
 script:
-  - docker images
+  - echo "✅ Build OK"
 
 deploy:
   provider: script
-  script: bash ./deploy.sh
+  skip_cleanup: true
+  script: bash -x ./deploy.sh
   on:
     tags: true
