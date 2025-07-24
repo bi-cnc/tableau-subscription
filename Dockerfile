@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /code
 
-COPY src/ .
+COPY . .
 
 # Přidej správná oprávnění ke všem souborům (včetně configuration.py)
 RUN chmod -R a+r /code
