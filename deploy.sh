@@ -1,7 +1,12 @@
 #!/bin/bash
-set -ex # Toto je klíčové! -e ukončí skript při chybě, -x vypíše prováděné příkazy
+set -ex
 
 echo "Starting deploy script..."
+
+# **NOVÝ KROK:** Instalace keboola-developer-portal-cli
+echo "Installing keboola-developer-portal-cli..."
+pip install keboola-developer-portal-cli || { echo "Failed to install keboola-developer-portal-cli."; exit 1; }
+echo "keboola-developer-portal-cli installed successfully."
 
 # 1. Získání informací o repozitáři a ECR přihlašovacích údajů do lokálního souboru
 echo "Obtaining repository info and ECR credentials..."
