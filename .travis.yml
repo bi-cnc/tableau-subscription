@@ -11,14 +11,20 @@ after_success:
   - docker images
 
 deploy:
-  # Dočasně změníme provider na "after_deploy" pro maximální kontrolu a ladění.
-  # Tento krok bude spuštěn místo standardního deploy provideru.
-  # Po nalezení chyby a nasazení komponenty bychom se vrátili k "provider: script".
-  provider: script # Stále je to script provider, ale upravíme, jak se spouští.
+  provider: script
   skip_cleanup: true
-  # Změna: Místo "script: ./deploy.sh" provedeme explicitní spuštění s debugováním.
   script: |
     echo "--- Debugging deploy.sh ---"
+    
+    # KLÍČOVÁ OPRAVA: Přidání cesty pro Ruby gems do PATH
+    # Tento řádek zajistí, že Bash najde `kbc-developer-portal`
+    export PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH" || { echo "Failed to add Ruby gem path to PATH."; exit 1; }
+    
+    echo "Current PATH: $PATH" # Pro ověření, že PATH je správně rozšířena
+    
+    # Ověření, zda je kbc-developer-portal nyní dostupný
+    which kbc-developer-portal || { echo "Error: kbc-developer-portal command not found after PATH update."; exit 1; }
+    
     chmod +x ./deploy.sh # Zajistíme spustitelná práva
     bash -e -x ./deploy.sh # Explicitně spustíme s debugem a chybovým ukončením
     echo "--- Debugging deploy.sh Finished ---"
