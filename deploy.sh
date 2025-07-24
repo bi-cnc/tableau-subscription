@@ -1,44 +1,33 @@
 #!/bin/bash
-set -ex
+set -e
 
-echo "Starting deploy script..."
+# Obtain the component repository and log in
+docker pull quay.io/keboola/developer-portal-cli-v2:latest
+export REPOSITORY=`docker run --rm  \
+    -e KBC_DEVELOPERPORTAL_USERNAME \
+    -e KBC_DEVELOPERPORTAL_PASSWORD \
+    quay.io/keboola/developer-portal-cli-v2:latest \
+    ecr:get-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP}`
+eval $(docker run --rm \
+    -e KBC_DEVELOPERPORTAL_USERNAME \
+    -e KBC_DEVELOPERPORTAL_PASSWORD \
+    quay.io/keboola/developer-portal-cli-v2:latest \
+    ecr:get-login ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
 
-# 1. Získání informací o repozitáři a ECR přihlašovacích údajů do lokálního souboru
-echo "Obtaining repository info and ECR credentials..."
-kbc-developer-portal get-repository \
-  --username "$KBC_DEVELOPERPORTAL_USERNAME" \
-  --password "$KBC_DEVELOPERPORTAL_PASSWORD" \
-  --vendor "$KBC_DEVELOPERPORTAL_VENDOR" \
-  --app "$KBC_DEVELOPERPORTAL_APP" \
-  --url https://developer-portal.keboola.com \
-  --file .kbc-developer-portal-cli-repository || { echo "Failed to get repository info."; exit 1; }
+# Push to the repository
+docker tag ${APP_IMAGE}:latest ${REPOSITORY}:${TRAVIS_TAG}
+docker tag ${APP_IMAGE}:latest ${REPOSITORY}:latest
+docker push ${REPOSITORY}:${TRAVIS_TAG}
+docker push ${REPOSITORY}:latest
 
-# 2. Načtení ECR URL a hesla ze souboru
-ECR_REPO_URL=$(jq -r '.ecr.url' .kbc-developer-portal-cli-repository)
-ECR_PASSWORD=$(jq -r '.ecr.password' .kbc-developer-portal-cli-repository)
-echo "ECR_REPO_URL: $ECR_REPO_URL"
-
-# 3. Přihlášení do Docker ECR registru
-echo "Logging into Docker ECR registry..."
-echo "$ECR_PASSWORD" | docker login -u AWS --password-stdin "$ECR_REPO_URL" || { echo "Failed to login to ECR."; exit 1; }
-
-# 4. Určení tagu pro Docker image
-TAG="${TRAVIS_TAG:-latest}"
-echo "Using image tag: $TAG"
-
-# 5. Tagování a pushování Docker obrazu
-echo "Tagging and pushing Docker image..."
-docker tag "$APP_IMAGE" "$ECR_REPO_URL:$TAG" || { echo "Failed to tag Docker image."; exit 1; }
-docker push "$ECR_REPO_URL:$TAG" || { echo "Failed to push Docker image."; exit 1; }
-
-# 6. Aktualizace komponenty v Developer Portálu
-if [ -n "$TRAVIS_TAG" ]; then
-  echo "Updating component version in Developer Portal to $TRAVIS_TAG..."
-  kbc-developer-portal update-component-version \
-    --repository-file .kbc-developer-portal-cli-repository \
-    --version "$TRAVIS_TAG" || { echo "Failed to update component version."; exit 1; }
+# Update the tag in Keboola Developer Portal -> Deploy to Keboola
+if echo ${TRAVIS_TAG} | grep -c '^v\?[0-9]\+\.[0-9]\+\.[0-9]\+$'
+then
+    docker run --rm \
+        -e KBC_DEVELOPERPORTAL_USERNAME \
+        -e KBC_DEVELOPERPORTAL_PASSWORD \
+        quay.io/keboola/developer-portal-cli-v2:latest \
+        update-app-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP} ${TRAVIS_TAG} ecr ${REPOSITORY}
 else
-  echo "Skipping component version update in Developer Portal (not a tagged build)."
+    echo "Skipping deployment to KBC, tag ${TRAVIS_TAG} is not allowed."
 fi
-
-echo "Deploy script finished successfully."
