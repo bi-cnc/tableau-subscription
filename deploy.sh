@@ -1,39 +1,42 @@
 #!/bin/bash
 set -e
+set -x  # <-- přidat pro debug výpisy
 
-# Stáhneme Keboola Developer Portal CLI
+echo "=== START DEPLOY ==="
+echo "Tag: ${TRAVIS_TAG}"
+
 docker pull quay.io/keboola/developer-portal-cli-v2:latest
 
-# Získáme URL pro Keboola ECR repo
+echo "=== GETTING ECR REPO ==="
 export REPOSITORY=$(docker run --rm \
-    -e KBC_DEVELOPERPORTAL_USERNAME \
-    -e KBC_DEVELOPERPORTAL_PASSWORD \
-    quay.io/keboola/developer-portal-cli-v2:latest \
-    ecr:get-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
+  -e KBC_DEVELOPERPORTAL_USERNAME \
+  -e KBC_DEVELOPERPORTAL_PASSWORD \
+  quay.io/keboola/developer-portal-cli-v2:latest \
+  ecr:get-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
 
-# Přihlásíme se do Keboola ECR
+echo "Repository URL: ${REPOSITORY}"
+
+echo "=== LOGIN TO ECR ==="
 eval $(docker run --rm \
-    -e KBC_DEVELOPERPORTAL_USERNAME \
-    -e KBC_DEVELOPERPORTAL_PASSWORD \
-    quay.io/keboola/developer-portal-cli-v2:latest \
-    ecr:get-login ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
+  -e KBC_DEVELOPERPORTAL_USERNAME \
+  -e KBC_DEVELOPERPORTAL_PASSWORD \
+  quay.io/keboola/developer-portal-cli-v2:latest \
+  ecr:get-login ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
 
-# Přetagujeme lokální image na Keboola ECR
+echo "=== DOCKER TAG + PUSH ==="
 docker tag ${APP_IMAGE}:latest ${REPOSITORY}:${TRAVIS_TAG}
 docker tag ${APP_IMAGE}:latest ${REPOSITORY}:latest
 
-# Pushneme image do Keboola ECR
 docker push ${REPOSITORY}:${TRAVIS_TAG}
 docker push ${REPOSITORY}:latest
 
-# Pokud je tag validní verze (x.y.z), aktualizujeme Developer Portal
+echo "=== UPDATE DEV PORTAL IF TAG VALID ==="
 if echo ${TRAVIS_TAG} | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-    echo "Valid version tag detected -> Updating Developer Portal"
-    docker run --rm \
-        -e KBC_DEVELOPERPORTAL_USERNAME \
-        -e KBC_DEVELOPERPORTAL_PASSWORD \
-        quay.io/keboola/developer-portal-cli-v2:latest \
-        update-app-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP} ${TRAVIS_TAG} ecr ${REPOSITORY}
+  docker run --rm \
+    -e KBC_DEVELOPERPORTAL_USERNAME \
+    -e KBC_DEVELOPERPORTAL_PASSWORD \
+    quay.io/keboola/developer-portal-cli-v2:latest \
+    update-app-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP} ${TRAVIS_TAG} ecr ${REPOSITORY}
 else
-    echo "Skipping Developer Portal update, tag '${TRAVIS_TAG}' is not a valid version (x.y.z)"
+  echo "Skipping Developer Portal update, tag '${TRAVIS_TAG}' is not valid"
 fi
