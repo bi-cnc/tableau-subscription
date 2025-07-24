@@ -1,42 +1,49 @@
 #!/bin/bash
-set -e
-set -x  # <-- přidat pro debug výpisy
+set -ex  # zapne debug výpisy a ukončí na první chybu
 
-echo "=== START DEPLOY ==="
-echo "Tag: ${TRAVIS_TAG}"
+echo "=== DEBUG: Starting deploy.sh ==="
+echo "TRAVIS_TAG=${TRAVIS_TAG}"
+echo "APP_IMAGE=${APP_IMAGE}"
+echo "KBC_DEVELOPERPORTAL_VENDOR=${KBC_DEVELOPERPORTAL_VENDOR}"
+echo "KBC_DEVELOPERPORTAL_APP=${KBC_DEVELOPERPORTAL_APP}"
 
+# Stáhneme Keboola Developer Portal CLI
 docker pull quay.io/keboola/developer-portal-cli-v2:latest
 
-echo "=== GETTING ECR REPO ==="
+echo "=== DEBUG: Getting repository URL from Keboola Developer Portal ==="
 export REPOSITORY=$(docker run --rm \
-  -e KBC_DEVELOPERPORTAL_USERNAME \
-  -e KBC_DEVELOPERPORTAL_PASSWORD \
-  quay.io/keboola/developer-portal-cli-v2:latest \
-  ecr:get-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
-
-echo "Repository URL: ${REPOSITORY}"
-
-echo "=== LOGIN TO ECR ==="
-eval $(docker run --rm \
-  -e KBC_DEVELOPERPORTAL_USERNAME \
-  -e KBC_DEVELOPERPORTAL_PASSWORD \
-  quay.io/keboola/developer-portal-cli-v2:latest \
-  ecr:get-login ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
-
-echo "=== DOCKER TAG + PUSH ==="
-docker tag ${APP_IMAGE}:latest ${REPOSITORY}:${TRAVIS_TAG}
-docker tag ${APP_IMAGE}:latest ${REPOSITORY}:latest
-
-docker push ${REPOSITORY}:${TRAVIS_TAG}
-docker push ${REPOSITORY}:latest
-
-echo "=== UPDATE DEV PORTAL IF TAG VALID ==="
-if echo ${TRAVIS_TAG} | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-  docker run --rm \
     -e KBC_DEVELOPERPORTAL_USERNAME \
     -e KBC_DEVELOPERPORTAL_PASSWORD \
     quay.io/keboola/developer-portal-cli-v2:latest \
-    update-app-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP} ${TRAVIS_TAG} ecr ${REPOSITORY}
+    ecr:get-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
+
+echo "=== DEBUG: Repository URL is ${REPOSITORY} ==="
+
+echo "=== DEBUG: Logging into ECR ==="
+eval $(docker run --rm \
+    -e KBC_DEVELOPERPORTAL_USERNAME \
+    -e KBC_DEVELOPERPORTAL_PASSWORD \
+    quay.io/keboola/developer-portal-cli-v2:latest \
+    ecr:get-login ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP})
+
+echo "=== DEBUG: Tagging image ==="
+docker tag ${APP_IMAGE}:latest ${REPOSITORY}:${TRAVIS_TAG}
+docker tag ${APP_IMAGE}:latest ${REPOSITORY}:latest
+
+echo "=== DEBUG: Pushing image to ECR ==="
+docker push ${REPOSITORY}:${TRAVIS_TAG}
+docker push ${REPOSITORY}:latest
+
+# Pokud je tag validní verze (x.y.z), aktualizujeme Developer Portal
+if echo ${TRAVIS_TAG} | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+    echo "=== DEBUG: Valid version tag detected -> Updating Developer Portal ==="
+    docker run --rm \
+        -e KBC_DEVELOPERPORTAL_USERNAME \
+        -e KBC_DEVELOPERPORTAL_PASSWORD \
+        quay.io/keboola/developer-portal-cli-v2:latest \
+        update-app-repository ${KBC_DEVELOPERPORTAL_VENDOR} ${KBC_DEVELOPERPORTAL_APP} ${TRAVIS_TAG} ecr ${REPOSITORY}
 else
-  echo "Skipping Developer Portal update, tag '${TRAVIS_TAG}' is not valid"
+    echo "=== DEBUG: Skipping Developer Portal update, invalid tag '${TRAVIS_TAG}' ==="
 fi
+
+echo "=== DEBUG: Finished deploy.sh ==="
