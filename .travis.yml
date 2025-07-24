@@ -4,9 +4,7 @@ services:
   - docker
 
 before_script:
-  # název lokálního image
-  - export APP_IMAGE=tableau-subscription
-  # postavíme image
+  - export APP_IMAGE=keboola-component
   - docker build . --tag=$APP_IMAGE
 
 after_success:
