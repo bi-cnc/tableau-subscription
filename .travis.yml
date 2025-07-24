@@ -11,8 +11,16 @@ after_success:
   - docker images
 
 deploy:
-  provider: script
+  # Dočasně změníme provider na "after_deploy" pro maximální kontrolu a ladění.
+  # Tento krok bude spuštěn místo standardního deploy provideru.
+  # Po nalezení chyby a nasazení komponenty bychom se vrátili k "provider: script".
+  provider: script # Stále je to script provider, ale upravíme, jak se spouští.
   skip_cleanup: true
-  script: ./deploy.sh
+  # Změna: Místo "script: ./deploy.sh" provedeme explicitní spuštění s debugováním.
+  script: |
+    echo "--- Debugging deploy.sh ---"
+    chmod +x ./deploy.sh # Zajistíme spustitelná práva
+    bash -e -x ./deploy.sh # Explicitně spustíme s debugem a chybovým ukončením
+    echo "--- Debugging deploy.sh Finished ---"
   on:
     tags: true
