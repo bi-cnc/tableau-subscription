@@ -3,10 +3,10 @@ set -ex
 
 echo "Starting deploy script..."
 
-# **NOVÝ KROK:** Instalace keboola-developer-portal-cli
-echo "Installing keboola-developer-portal-cli..."
-pip install keboola-developer-portal-cli || { echo "Failed to install keboola-developer-portal-cli."; exit 1; }
-echo "keboola-developer-portal-cli installed successfully."
+# **OPRAVENÝ KROK:** Instalace keboola-developer-portal-cli (správný název balíčku)
+echo "Installing keboola-developer-portal..."
+pip install keboola-developer-portal || { echo "Failed to install keboola-developer-portal."; exit 1; }
+echo "keboola-developer-portal installed successfully."
 
 # 1. Získání informací o repozitáři a ECR přihlašovacích údajů do lokálního souboru
 echo "Obtaining repository info and ECR credentials..."
