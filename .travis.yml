@@ -15,72 +15,16 @@ deploy:
   skip_cleanup: true
   script: |
     echo "--- Debugging deploy.sh ---"
+    # Přidání cesty pro Ruby gems do PATH
+    export PATH="$HOME/bin:$HOME/perl5/perlbrew/bin:$HOME/.rvm/bin:$PATH"
+    export PATH="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin:$PATH" || { echo "Failed to add Ruby gem path to PATH."; exit 1; }
+    echo "Current PATH: $PATH"
     
-    # Odebereme předchozí export PATH, protože RVM PATH už tam je
-    # a `Gem.user_dir` nás mate.
-    # Necháme pouze ty části, co Travis CI automaticky nastaví pro RVM
+    # Ověření, zda je kbc-developer-portal nyní dostupný
+    which kbc-developer-portal || { echo "Error: kbc-developer-portal command not found after PATH update."; exit 1; }
     
-    # Nyní explicitně zkusíme cestu k binárce kbc-developer-portal
-    # Tato cesta se odvozuje od RVM instalace Ruby a gemů.
-    # `kbc-developer-portal` je binárka z 'regstry' gemu
-    KBC_DEV_PORTAL_BIN="/home/travis/.rvm/gems/ruby-3.3.5/bin/kbc-developer-portal"
-    
-    echo "Attempting to use KBC_DEV_PORTAL_BIN: $KBC_DEV_PORTAL_BIN"
-    
-    # Ověření, zda soubor existuje a je spustitelný
-    if [ -x "$KBC_DEV_PORTAL_BIN" ]; then
-      echo "kbc-developer-portal binary found and is executable at $KBC_DEV_PORTAL_BIN"
-    else
-      echo "Error: kbc-developer-portal binary NOT found or NOT executable at $KBC_DEV_PORTAL_BIN"
-      # Zkusíme zjistit, kde by se mohlo nacházet
-      echo "Trying to locate kbc-developer-portal through all rvm gem bins..."
-      find /home/travis/.rvm/gems/ruby-3.3.5/ -name "kbc-developer-portal" || true
-      find /home/travis/.rvm/gems/ruby-3.3.5@global/ -name "kbc-developer-portal" || true
-      exit 1
-    fi
-    
-    chmod +x ./deploy.sh # Zajistíme spustitelná práva pro náš skript
-    
-    # Nyní spustíme náš deploy.sh, ale s explicitním voláním kbc-developer-portal
-    bash -e -x -c "
-      echo 'Starting deploy script with explicit KBC_DEV_PORTAL_BIN...'
-      
-      # 1. Získání informací o repozitáři a ECR přihlašovacích údajů do lokálního souboru
-      echo 'Obtaining repository info and ECR credentials...'
-      \"$KBC_DEV_PORTAL_BIN\" get-repository \\
-        --username \"$KBC_DEVELOPERPORTAL_USERNAME\" \\
-        --password \"$KBC_DEVELOPERPORTAL_PASSWORD\" \\
-        --vendor \"$KBC_DEVELOPERPORTAL_VENDOR\" \\
-        --app \"$KBC_DEVELOPERPORTAL_APP\" \\
-        --url https://developer-portal.keboola.com \\
-        --file .kbc-developer-portal-cli-repository || { echo 'Failed to get repository info.'; exit 1; }
-
-      # Další kroky jsou stejné, ale volají přímo cestu k binárce
-      ECR_REPO_URL=\$(jq -r '.ecr.url' .kbc-developer-portal-cli-repository)
-      ECR_PASSWORD=\$(jq -r '.ecr.password' .kbc-developer-portal-cli-repository)
-      echo \"ECR_REPO_URL: \$ECR_REPO_URL\"
-
-      echo \"Logging into Docker ECR registry...\"
-      echo \"\$ECR_PASSWORD\" | docker login -u AWS --password-stdin \"\$ECR_REPO_URL\" || { echo \"Failed to login to ECR.\"; exit 1; }
-
-      TAG=\"\${TRAVIS_TAG:-latest}\"
-      echo \"Using image tag: \$TAG\"
-
-      echo \"Tagging and pushing Docker image...\"
-      docker tag \"\$APP_IMAGE\" \"\$ECR_REPO_URL:\$TAG\" || { echo \"Failed to tag Docker image.\"; exit 1; }
-      docker push \"\$ECR_REPO_URL:\$TAG\" || { echo \"Failed to push Docker image.\"; exit 1; }
-
-      if [ -n \"\$TRAVIS_TAG\" ]; then
-        echo \"Updating component version in Developer Portal to \$TRAVIS_TAG...\"
-        \"$KBC_DEV_PORTAL_BIN\" update-component-version \\
-          --repository-file .kbc-developer-portal-cli-repository \\
-          --version \"\$TRAVIS_TAG\" || { echo \"Failed to update component version.\"; exit 1; }
-      else
-        echo \"Skipping component version update in Developer Portal (not a tagged build).\"
-      fi
-
-      echo \"Deploy script finished successfully.\"
-    "
+    chmod +x ./deploy.sh
+    bash -e -x ./deploy.sh
     echo "--- Debugging deploy.sh Finished ---"
   on:
     tags: true
