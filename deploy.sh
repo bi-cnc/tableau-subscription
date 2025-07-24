@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex # Zajistí, že skript se ukončí okamžitě při jakékoli chybě a vypíše prováděný příkaz
+set -ex # Toto je klíčové! -e ukončí skript při chybě, -x vypíše prováděné příkazy
 
 echo "Starting deploy script..."
 
@@ -23,8 +23,6 @@ echo "Logging into Docker ECR registry..."
 echo "$ECR_PASSWORD" | docker login -u AWS --password-stdin "$ECR_REPO_URL" || { echo "Failed to login to ECR."; exit 1; }
 
 # 4. Určení tagu pro Docker image
-# TRAVIS_TAG je proměnná prostředí nastavená Travis CI, když se build spustí na tagu.
-# Pokud build není na tagu, použijeme "latest"
 TAG="${TRAVIS_TAG:-latest}"
 echo "Using image tag: $TAG"
 
@@ -34,8 +32,7 @@ docker tag "$APP_IMAGE" "$ECR_REPO_URL:$TAG" || { echo "Failed to tag Docker ima
 docker push "$ECR_REPO_URL:$TAG" || { echo "Failed to push Docker image."; exit 1; }
 
 # 6. Aktualizace komponenty v Developer Portálu
-# Pouze pokud je to verze s tagem (tj. není to "latest" nebo jiný netagovaný build)
-if [ -n "$TRAVIS_TAG" ]; then # Kontrola, zda je TRAVIS_TAG definován (tj. build je na tagu)
+if [ -n "$TRAVIS_TAG" ]; then
   echo "Updating component version in Developer Portal to $TRAVIS_TAG..."
   kbc-developer-portal update-component-version \
     --repository-file .kbc-developer-portal-cli-repository \
