@@ -15,7 +15,6 @@ class Configuration:
 
         # Načti konfigurační soubor
         config_path = os.path.join(self.root, "config.json")
-        # print("Loaded config_data:", json.dumps(config_data, indent=2))
         try:
             with open(config_path, 'r') as file:
                 config_data = json.load(file)
@@ -24,34 +23,31 @@ class Configuration:
             sys.exit(1)
 
         self.parameters = config_data.get("parameters", {})
-        self.image_params = config_data.get("image_parameters", {})
 
-        # Z parametrů
+        # Z parametrů (sloučeny původní "image_parameters")
         self.incremental = bool(self.parameters.get("incremental", False))
         self.tableau_token_name = self.parameters.get("tableau_token_name")
         self.tableau_token_secret = self.parameters.get("#tableau_token_secret")
         self.server = self.parameters.get("server")
         self.site = self.parameters.get("site")
-        self.api_version = self.parameters.get("api_version") or self.image_params.get("api_version")
+        self.api_version = self.parameters.get("api_version")
         self.gmail_address = self.parameters.get("gmail_address")
         self.gmail_pass = self.parameters.get("#gmail_pass")
         self.run_specific_email = self.parameters.get("run_specific_email", "")
         self.folder_id = self.parameters.get("folder_id", "")
 
-        # Z image_parameters
-        # Z image_parameters
-        self.timing_rule = self.image_params.get("timing", {})
-        self.gmail_port = self.image_params.get("gmail_port", 587)
-        self.imap_port = self.image_params.get("imap_port", 993)
-        self.allowed_workbook_format = self.image_params.get("allowed_workbook_format", [])
-        self.allowed_view_format = self.image_params.get("allowed_view_format", [])
-        self.user_token = self.image_params.get("user_token", {})
+        self.timing_rule = self.parameters.get("timing", {})
+        self.gmail_port = self.parameters.get("gmail_port", 587)
+        self.imap_port = self.parameters.get("imap_port", 993)
+        self.allowed_workbook_format = self.parameters.get("allowed_workbook_format", [])
+        self.allowed_view_format = self.parameters.get("allowed_view_format", [])
+        self.user_token = self.parameters.get("user_token", {})
 
         # ➤ Rozdělené service účty:
-        self.service_account_post = self.image_params.get("service_account_post", {})
-        self.service_account_read = self.image_params.get("service_account_read", {})
+        self.service_account_post = self.parameters.get("service_account_post", {})
+        self.service_account_read = self.parameters.get("service_account_read", {})
 
-        # Schéma výstupních tabulek (volitelně můžeš oddělit)
+        # Schéma výstupních tabulek
         self.schemas = {
             "tables": [
                 {
@@ -66,6 +62,7 @@ class Configuration:
                 }
             ]
         }
+
 
     def get_input_data(self):
         try:
