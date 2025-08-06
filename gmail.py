@@ -20,9 +20,9 @@ class Gmail:
         SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 
         # ➤ Používáme service_account_post (pro odesílání)
-        service_account_info = self.cfg.service_account_post
+        service_account_info = self.cfg.image_params.get("service_account_post")
         if not service_account_info:
-            raise Exception("Missing 'service_account_post' in parameters!")
+            raise Exception("Missing 'service_account_post' in image_parameters!")
 
         user_to_impersonate = self.cfg.gmail_address
         if not user_to_impersonate:
