@@ -19,15 +19,25 @@ class Gmail:
     def gmail_login(self):
         SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 
-        # ➤ Používáme service_account_post (pro odesílání)
+        # Načtení service account dat
         service_account_info = self.cfg.image_params.get("service_account_post")
         if not service_account_info:
-            raise Exception("Missing 'service_account_post' in image_parameters!")
+            raise Exception("Missing 'service_account_post' in image_parameters or stack parameters!")
+
+        # --- DEBUG BEZPEČNÝ VÝPIS ---
+        safe_dump = {
+            k: (v[:20] + "...") if isinstance(v, str) and len(v) > 20 else v
+            for k, v in service_account_info.items()
+        }
+        print("==== DEBUG: service_account_post (safe) ====")
+        print(json.dumps(safe_dump, indent=2))
+        print("============================================")
 
         user_to_impersonate = self.cfg.gmail_address
         if not user_to_impersonate:
             raise Exception("Missing 'gmail_address' in parameters!")
 
+        # Přihlášení pomocí service account
         self.creds = SACredentials.from_service_account_info(
             service_account_info,
             scopes=SCOPES
