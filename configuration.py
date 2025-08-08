@@ -7,7 +7,6 @@ import os
 
 from exceptions import UserException
 
-
 class Configuration:
     def __init__(self, root_directory="/data", code_directory="/code"):
         self.root = root_directory
@@ -15,43 +14,46 @@ class Configuration:
 
         # Načti konfigurační soubor
         config_path = os.path.join(self.root, "config.json")
-        # print("Loaded config_data:", json.dumps(config_data, indent=2))
         try:
             with open(config_path, 'r') as file:
                 config_data = json.load(file)
         except Exception as e:
-            print(f"❌ Chyba při načítání config.json: {e}", file=sys.stderr)
+            print(f"\u274c Chyba při načítání config.json: {e}", file=sys.stderr)
             sys.exit(1)
 
         self.parameters = config_data.get("parameters", {})
-        self.image_params = config_data.get("image_parameters", {})
 
-        # Z parametrů
+        # Načti stack_parameters z proměnné prostředí
+        try:
+            stack_params_env = os.environ.get("KBC_STACK_PARAMETERS", "{}")
+            stack_params = json.loads(stack_params_env)
+            self.stack_parameters = stack_params.get("connection.eu-central-1.keboola.com", {})
+        except Exception as e:
+            print(f"\u274c Chyba při načítání stack_parameters: {e}", file=sys.stderr)
+            self.stack_parameters = {}
+
+        # Z parameters (uživatelská konfigurace)
         self.incremental = bool(self.parameters.get("incremental", False))
         self.tableau_token_name = self.parameters.get("tableau_token_name")
         self.tableau_token_secret = self.parameters.get("#tableau_token_secret")
         self.server = self.parameters.get("server")
         self.site = self.parameters.get("site")
-        self.api_version = self.parameters.get("api_version") or self.image_params.get("api_version")
+        self.api_version = self.parameters.get("api_version")
         self.gmail_address = self.parameters.get("gmail_address")
         self.gmail_pass = self.parameters.get("#gmail_pass")
         self.run_specific_email = self.parameters.get("run_specific_email", "")
         self.folder_id = self.parameters.get("folder_id", "")
 
-        # Z image_parameters
-        # Z image_parameters
-        self.timing_rule = self.image_params.get("timing", {})
-        self.gmail_port = self.image_params.get("gmail_port", 587)
-        self.imap_port = self.image_params.get("imap_port", 993)
-        self.allowed_workbook_format = self.image_params.get("allowed_workbook_format", [])
-        self.allowed_view_format = self.image_params.get("allowed_view_format", [])
-        self.user_token = self.image_params.get("user_token", {})
+        # Z stack_parameters (region-specific + citlivá data)
+        self.timing_rule = self.stack_parameters.get("timing", {})
+        self.gmail_port = self.stack_parameters.get("gmail_port", 465)
+        self.imap_port = self.stack_parameters.get("imap_port", 993)
+        self.allowed_workbook_format = self.stack_parameters.get("allowed_workbook_format", [])
+        self.allowed_view_format = self.stack_parameters.get("allowed_view_format", [])
+        self.user_token = self.stack_parameters.get("user_token", {})
+        self.service_account_post = self.stack_parameters.get("service_account_post", {})
+        self.service_account_read = self.stack_parameters.get("service_account_read", {})
 
-        # ➤ Rozdělené service účty:
-        self.service_account_post = self.image_params.get("service_account_post", {})
-        self.service_account_read = self.image_params.get("service_account_read", {})
-
-        # Schéma výstupních tabulek (volitelně můžeš oddělit)
         self.schemas = {
             "tables": [
                 {
