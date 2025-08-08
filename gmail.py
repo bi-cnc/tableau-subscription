@@ -1,5 +1,3 @@
-import os
-import json
 import base64
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -17,43 +15,43 @@ class Gmail:
         self.creds = None
 
     def gmail_login(self):
-        # Používáme delegaci přes service account (posílání e-mailů)
         SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
-        # ✔️ Bereme z Configuration, kde už je to načtené ze Stack Parameters
-        service_account_info = self.cfg.service_account_post
-        if not service_account_info:
-            raise Exception("Missing 'service_account_post' in stack parameters!")
+        # stack params primárně, fallback image_params (pokud Storage API mergne)
+        sa_post = self.cfg.service_account_post or self.cfg.image_params.get("service_account_post", {})
+        print("🔎 gmail_login: service_account_post keys:", list(sa_post.keys()) if isinstance(sa_post, dict) else type(sa_post))
+
+        if not sa_post:
+            raise Exception("Missing 'service_account_post' in stack/image parameters!")
 
         user_to_impersonate = self.cfg.gmail_address
+        print("🔎 gmail_login: gmail_address present:", bool(user_to_impersonate))
         if not user_to_impersonate:
             raise Exception("Missing 'gmail_address' in parameters!")
 
-        # Základní sanity check na povinné klíče service accountu
+        # sanity check
         for k in ("type", "client_email", "private_key"):
-            if k not in service_account_info or not service_account_info[k]:
-                raise Exception(f"Missing '{k}' in service_account_post stack parameters!")
+            if k not in sa_post or not sa_post[k]:
+                raise Exception(f"Missing '{k}' in service_account_post!")
 
         self.creds = (
-            SACredentials.from_service_account_info(service_account_info, scopes=SCOPES)
+            SACredentials.from_service_account_info(sa_post, scopes=SCOPES)
             .with_subject(user_to_impersonate)
         )
 
-        service = build("gmail", "v1", credentials=self.creds)
-        return service
+        print("✅ gmail_login: service account credentials created.")
+        return build("gmail", "v1", credentials=self.creds)
 
     def send_email(self, to, raw_message_string):
         try:
-            raw_message = base64.urlsafe_b64encode(
-                raw_message_string.encode("utf-8")
-            ).decode("utf-8")
-            raw_message = {"raw": raw_message}
+            raw_message = base64.urlsafe_b64encode(raw_message_string.encode('utf-8')).decode('utf-8')
+            raw_message = {'raw': raw_message}
 
-            service = build("gmail", "v1", credentials=self.creds)
-            message = service.users().messages().send(userId="me", body=raw_message).execute()
-            print(f"Message sent successfully: {message.get('id')}")
+            service = build('gmail', 'v1', credentials=self.creds)
+            message = service.users().messages().send(userId='me', body=raw_message).execute()
+            print(f"✅ Message sent: {message.get('id')}")
         except Exception as error:
-            print(f"Failed to send email: {error}")
+            print(f"❌ Failed to send email: {error}")
 
     def construct_message(self, subject, to, text):
         if not subject or not to or not text:
@@ -68,13 +66,13 @@ class Gmail:
 
     def attach_to_message(self, message, attachment, attachment_name, file_type):
         if file_type == "crosstab/excel":
-            mime_type = "application/vnd.ms-excel"
+            mime_type = 'application/vnd.ms-excel'
         else:
-            mime_type = "application/octet-stream"
+            mime_type = 'application/octet-stream'
 
-        mime_base = MIMEBase("application", mime_type)
+        mime_base = MIMEBase('application', mime_type)
         mime_base.set_payload(attachment)
         encoders.encode_base64(mime_base)
-        mime_base.add_header("Content-Disposition", f"attachment; filename={attachment_name}")
+        mime_base.add_header('Content-Disposition', f'attachment; filename={attachment_name}')
         message.attach(mime_base)
         return message
