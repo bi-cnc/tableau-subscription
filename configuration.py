@@ -8,19 +8,14 @@ import os
 from exceptions import UserException
 
 
-def _safe_keys(d):
-    try:
-        return list(d.keys())
-    except Exception:
-        return []
-
 class Configuration:
     def __init__(self, root_directory="/data", code_directory="/code"):
         self.root = root_directory
         self.code_directory = code_directory
 
-        # Načti config.json
+        # Načti konfigurační soubor
         config_path = os.path.join(self.root, "config.json")
+        # print("Loaded config_data:", json.dumps(config_data, indent=2))
         try:
             with open(config_path, 'r') as file:
                 config_data = json.load(file)
@@ -28,68 +23,35 @@ class Configuration:
             print(f"❌ Chyba při načítání config.json: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # Parametry z config.json (UI)
         self.parameters = config_data.get("parameters", {})
-        self.image_params = config_data.get("image_parameters", {})  # fallback
+        self.image_params = config_data.get("image_parameters", {})
 
-        # === STACK PARAMETERS loader (robustní) ===
-        stack_params_env = os.environ.get("KBC_STACK_PARAMETERS")
-        stack_params = {}
-        if stack_params_env:
-            print("ℹ️ KBC_STACK_PARAMETERS present: True")
-            print("ℹ️ KBC_STACK_PARAMETERS head:", stack_params_env[:200].replace("\n", " "))
-            try:
-                parsed = json.loads(stack_params_env)
-                if "connection.eu-central-1.keboola.com" in parsed:
-                    stack_params = parsed["connection.eu-central-1.keboola.com"]
-                    print("ℹ️ Using region key: connection.eu-central-1.keboola.com")
-                else:
-                    stack_params = parsed
-                    print("ℹ️ Using stack params without region key (flattened).")
-            except Exception as e:
-                print(f"⚠️ Nelze parse-ovat KBC_STACK_PARAMETERS: {e}", file=sys.stderr)
-        else:
-            print("ℹ️ KBC_STACK_PARAMETERS present: False")
-
-        # primární zdroj stack-like parametrů
-        sp = stack_params or self.image_params or {}
-        src = "KBC_STACK_PARAMETERS" if stack_params else ("image_parameters (fallback)" if self.image_params else "EMPTY")
-        print(f"ℹ️ Stack-like param source: {src}; keys: {_safe_keys(sp)}")
-        print(f"ℹ️ image_parameters keys: {_safe_keys(self.image_params)}")
-
-        # Z parameters (UI)
+        # Z parametrů
         self.incremental = bool(self.parameters.get("incremental", False))
         self.tableau_token_name = self.parameters.get("tableau_token_name")
         self.tableau_token_secret = self.parameters.get("#tableau_token_secret")
         self.server = self.parameters.get("server")
         self.site = self.parameters.get("site")
+        self.api_version = self.parameters.get("api_version") or self.image_params.get("api_version")
         self.gmail_address = self.parameters.get("gmail_address")
         self.gmail_pass = self.parameters.get("#gmail_pass")
         self.run_specific_email = self.parameters.get("run_specific_email", "")
         self.folder_id = self.parameters.get("folder_id", "")
 
-        # Z stack/image parameters
-        self.timing_rule = sp.get("timing", {})
-        self.gmail_port = sp.get("gmail_port", 465)
-        self.imap_port = sp.get("imap_port", 993)
-        self.allowed_workbook_format = sp.get("allowed_workbook_format", [])
-        self.allowed_view_format = sp.get("allowed_view_format", [])
-        self.user_token = sp.get("user_token", {})
-        self.service_account_post = sp.get("service_account_post", {})
-        self.service_account_read = sp.get("service_account_read", {})
-        self.api_version = self.parameters.get("api_version") or sp.get("api_version", 3.9)
+        # Z image_parameters
+        # Z image_parameters
+        self.timing_rule = self.image_params.get("timing", {})
+        self.gmail_port = self.image_params.get("gmail_port", 587)
+        self.imap_port = self.image_params.get("imap_port", 993)
+        self.allowed_workbook_format = self.image_params.get("allowed_workbook_format", [])
+        self.allowed_view_format = self.image_params.get("allowed_view_format", [])
+        self.user_token = self.image_params.get("user_token", {})
 
-        # Debug – rychlá kontrola klíčů (bez citlivých hodnot)
-        print("🔎 service_account_post keys:", _safe_keys(self.service_account_post))
-        print("🔎 service_account_read  keys:", _safe_keys(self.service_account_read))
-        print("🔎 timing_rule present:", bool(self.timing_rule))
-        print("🔎 ports:", {"gmail_port": self.gmail_port, "imap_port": self.imap_port})
-        print("🔎 allowed formats:", {
-            "workbook": self.allowed_workbook_format,
-            "view": self.allowed_view_format
-        })
+        # ➤ Rozdělené service účty:
+        self.service_account_post = self.image_params.get("service_account_post", {})
+        self.service_account_read = self.image_params.get("service_account_read", {})
 
-        # Schéma výstupních tabulek (volitelné)
+        # Schéma výstupních tabulek (volitelně můžeš oddělit)
         self.schemas = {
             "tables": [
                 {
