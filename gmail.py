@@ -17,33 +17,41 @@ class Gmail:
         self.creds = None
 
     def gmail_login(self):
-        SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+        # Používáme delegaci přes service account (posílání e-mailů)
+        SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
 
-        # ➤ Používáme service_account_post (pro odesílání)
-        service_account_info = self.cfg.image_params.get("service_account_post")
+        # ✔️ Bereme z Configuration, kde už je to načtené ze Stack Parameters
+        service_account_info = self.cfg.service_account_post
         if not service_account_info:
-            raise Exception("Missing 'service_account_post' in image_parameters!")
+            raise Exception("Missing 'service_account_post' in stack parameters!")
 
         user_to_impersonate = self.cfg.gmail_address
         if not user_to_impersonate:
             raise Exception("Missing 'gmail_address' in parameters!")
 
-        self.creds = SACredentials.from_service_account_info(
-            service_account_info,
-            scopes=SCOPES
-        ).with_subject(user_to_impersonate)
+        # Základní sanity check na povinné klíče service accountu
+        for k in ("type", "client_email", "private_key"):
+            if k not in service_account_info or not service_account_info[k]:
+                raise Exception(f"Missing '{k}' in service_account_post stack parameters!")
 
-        service = build('gmail', 'v1', credentials=self.creds)
+        self.creds = (
+            SACredentials.from_service_account_info(service_account_info, scopes=SCOPES)
+            .with_subject(user_to_impersonate)
+        )
+
+        service = build("gmail", "v1", credentials=self.creds)
         return service
 
     def send_email(self, to, raw_message_string):
         try:
-            raw_message = base64.urlsafe_b64encode(raw_message_string.encode('utf-8')).decode('utf-8')
-            raw_message = {'raw': raw_message}
+            raw_message = base64.urlsafe_b64encode(
+                raw_message_string.encode("utf-8")
+            ).decode("utf-8")
+            raw_message = {"raw": raw_message}
 
-            service = build('gmail', 'v1', credentials=self.creds)
-            message = service.users().messages().send(userId='me', body=raw_message).execute()
-            print(f"Message sent successfully: {message['id']}")
+            service = build("gmail", "v1", credentials=self.creds)
+            message = service.users().messages().send(userId="me", body=raw_message).execute()
+            print(f"Message sent successfully: {message.get('id')}")
         except Exception as error:
             print(f"Failed to send email: {error}")
 
@@ -60,13 +68,13 @@ class Gmail:
 
     def attach_to_message(self, message, attachment, attachment_name, file_type):
         if file_type == "crosstab/excel":
-            mime_type = 'application/vnd.ms-excel'
+            mime_type = "application/vnd.ms-excel"
         else:
-            mime_type = 'application/octet-stream'
+            mime_type = "application/octet-stream"
 
-        mime_base = MIMEBase('application', mime_type)
+        mime_base = MIMEBase("application", mime_type)
         mime_base.set_payload(attachment)
         encoders.encode_base64(mime_base)
-        mime_base.add_header('Content-Disposition', f'attachment; filename={attachment_name}')
+        mime_base.add_header("Content-Disposition", f"attachment; filename={attachment_name}")
         message.attach(mime_base)
         return message
