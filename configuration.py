@@ -7,53 +7,68 @@ import os
 
 from exceptions import UserException
 
+
 class Configuration:
     def __init__(self, root_directory="/data", code_directory="/code"):
         self.root = root_directory
         self.code_directory = code_directory
 
-        # Načti konfigurační soubor
+        # Načti config.json
         config_path = os.path.join(self.root, "config.json")
         try:
             with open(config_path, 'r') as file:
                 config_data = json.load(file)
         except Exception as e:
-            print(f"\u274c Chyba při načítání config.json: {e}", file=sys.stderr)
+            print(f"❌ Chyba při načítání config.json: {e}", file=sys.stderr)
             sys.exit(1)
 
+        # Parametry z config.json
         self.parameters = config_data.get("parameters", {})
+        self.image_params = config_data.get("image_parameters", {})  # fallback
 
-        # Načti stack_parameters z proměnné prostředí
-        try:
-            stack_params_env = os.environ.get("KBC_STACK_PARAMETERS", "{}")
-            stack_params = json.loads(stack_params_env)
-            self.stack_parameters = stack_params.get("connection.eu-central-1.keboola.com", {})
-        except Exception as e:
-            print(f"\u274c Chyba při načítání stack_parameters: {e}", file=sys.stderr)
-            self.stack_parameters = {}
+        # === STACK PARAMETERS loader ===
+        stack_params_env = os.environ.get("KBC_STACK_PARAMETERS")
+        stack_params = {}
+        if stack_params_env:
+            try:
+                parsed = json.loads(stack_params_env)
+                if "connection.eu-central-1.keboola.com" in parsed:
+                    stack_params = parsed["connection.eu-central-1.keboola.com"]
+                else:
+                    stack_params = parsed
+            except Exception as e:
+                print(f"⚠️ Nelze parse-ovat KBC_STACK_PARAMETERS: {e}", file=sys.stderr)
 
-        # Z parameters (uživatelská konfigurace)
+        # primární zdroj stack-like parametrů
+        sp = stack_params or self.image_params or {}
+
+        # Debug info – hned víš, odkud to vzal
+        src = "KBC_STACK_PARAMETERS" if stack_params else "image_parameters (fallback)"
+        print(f"ℹ️ Stack-like param source: {src}; keys: {list(sp.keys())}")
+
+        # Z parametrů
         self.incremental = bool(self.parameters.get("incremental", False))
         self.tableau_token_name = self.parameters.get("tableau_token_name")
         self.tableau_token_secret = self.parameters.get("#tableau_token_secret")
         self.server = self.parameters.get("server")
         self.site = self.parameters.get("site")
-        self.api_version = self.parameters.get("api_version")
         self.gmail_address = self.parameters.get("gmail_address")
         self.gmail_pass = self.parameters.get("#gmail_pass")
         self.run_specific_email = self.parameters.get("run_specific_email", "")
         self.folder_id = self.parameters.get("folder_id", "")
 
-        # Z stack_parameters (region-specific + citlivá data)
-        self.timing_rule = self.stack_parameters.get("timing", {})
-        self.gmail_port = self.stack_parameters.get("gmail_port", 465)
-        self.imap_port = self.stack_parameters.get("imap_port", 993)
-        self.allowed_workbook_format = self.stack_parameters.get("allowed_workbook_format", [])
-        self.allowed_view_format = self.stack_parameters.get("allowed_view_format", [])
-        self.user_token = self.stack_parameters.get("user_token", {})
-        self.service_account_post = self.stack_parameters.get("service_account_post", {})
-        self.service_account_read = self.stack_parameters.get("service_account_read", {})
+        # Z stack/image parameters
+        self.timing_rule = sp.get("timing", {})
+        self.gmail_port = sp.get("gmail_port", 465)
+        self.imap_port = sp.get("imap_port", 993)
+        self.allowed_workbook_format = sp.get("allowed_workbook_format", [])
+        self.allowed_view_format = sp.get("allowed_view_format", [])
+        self.user_token = sp.get("user_token", {})
+        self.service_account_post = sp.get("service_account_post", {})
+        self.service_account_read = sp.get("service_account_read", {})
+        self.api_version = self.parameters.get("api_version") or sp.get("api_version", 3.9)
 
+        # Schéma výstupních tabulek (volitelné)
         self.schemas = {
             "tables": [
                 {
