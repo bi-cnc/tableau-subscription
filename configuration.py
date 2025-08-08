@@ -8,6 +8,12 @@ import os
 from exceptions import UserException
 
 
+def _safe_keys(d):
+    try:
+        return list(d.keys())
+    except Exception:
+        return []
+
 class Configuration:
     def __init__(self, root_directory="/data", code_directory="/code"):
         self.root = root_directory
@@ -22,31 +28,36 @@ class Configuration:
             print(f"❌ Chyba při načítání config.json: {e}", file=sys.stderr)
             sys.exit(1)
 
-        # Parametry z config.json
+        # Parametry z config.json (UI)
         self.parameters = config_data.get("parameters", {})
         self.image_params = config_data.get("image_parameters", {})  # fallback
 
-        # === STACK PARAMETERS loader ===
+        # === STACK PARAMETERS loader (robustní) ===
         stack_params_env = os.environ.get("KBC_STACK_PARAMETERS")
         stack_params = {}
         if stack_params_env:
+            print("ℹ️ KBC_STACK_PARAMETERS present: True")
+            print("ℹ️ KBC_STACK_PARAMETERS head:", stack_params_env[:200].replace("\n", " "))
             try:
                 parsed = json.loads(stack_params_env)
                 if "connection.eu-central-1.keboola.com" in parsed:
                     stack_params = parsed["connection.eu-central-1.keboola.com"]
+                    print("ℹ️ Using region key: connection.eu-central-1.keboola.com")
                 else:
                     stack_params = parsed
+                    print("ℹ️ Using stack params without region key (flattened).")
             except Exception as e:
                 print(f"⚠️ Nelze parse-ovat KBC_STACK_PARAMETERS: {e}", file=sys.stderr)
+        else:
+            print("ℹ️ KBC_STACK_PARAMETERS present: False")
 
         # primární zdroj stack-like parametrů
         sp = stack_params or self.image_params or {}
+        src = "KBC_STACK_PARAMETERS" if stack_params else ("image_parameters (fallback)" if self.image_params else "EMPTY")
+        print(f"ℹ️ Stack-like param source: {src}; keys: {_safe_keys(sp)}")
+        print(f"ℹ️ image_parameters keys: {_safe_keys(self.image_params)}")
 
-        # Debug info – hned víš, odkud to vzal
-        src = "KBC_STACK_PARAMETERS" if stack_params else "image_parameters (fallback)"
-        print(f"ℹ️ Stack-like param source: {src}; keys: {list(sp.keys())}")
-
-        # Z parametrů
+        # Z parameters (UI)
         self.incremental = bool(self.parameters.get("incremental", False))
         self.tableau_token_name = self.parameters.get("tableau_token_name")
         self.tableau_token_secret = self.parameters.get("#tableau_token_secret")
@@ -67,6 +78,16 @@ class Configuration:
         self.service_account_post = sp.get("service_account_post", {})
         self.service_account_read = sp.get("service_account_read", {})
         self.api_version = self.parameters.get("api_version") or sp.get("api_version", 3.9)
+
+        # Debug – rychlá kontrola klíčů (bez citlivých hodnot)
+        print("🔎 service_account_post keys:", _safe_keys(self.service_account_post))
+        print("🔎 service_account_read  keys:", _safe_keys(self.service_account_read))
+        print("🔎 timing_rule present:", bool(self.timing_rule))
+        print("🔎 ports:", {"gmail_port": self.gmail_port, "imap_port": self.imap_port})
+        print("🔎 allowed formats:", {
+            "workbook": self.allowed_workbook_format,
+            "view": self.allowed_view_format
+        })
 
         # Schéma výstupních tabulek (volitelné)
         self.schemas = {
