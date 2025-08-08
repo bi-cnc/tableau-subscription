@@ -2,7 +2,6 @@ import pandas as pd
 import json
 import re
 import unidecode
-import mimetypes
 import os
 import glob
 from PyPDF2 import PdfMerger
@@ -10,7 +9,6 @@ from PyPDF2 import PdfMerger
 from configuration import Configuration
 from Tableau_driver import Tableau
 from gmail import Gmail
-from chat import Chat
 
 
 class Driver:
@@ -41,9 +39,6 @@ class Driver:
         self.gmail = Gmail(root_directory, code_directory)
         self.gmail.gmail_login()
         print(">>> GMAIL LOGIN SUCCESS")
-
-        self.chat = Chat(root_directory, code_directory)
-        print(">>> CHAT OBJECT CREATED")
         print(">>> DRIVER INIT FINISHED")
 
     def run(self):
@@ -93,15 +88,7 @@ class Driver:
                         except Exception as e:
                             print(f"\u274c Error appending PDF {tmp_path}: {e}")
                     else:
-                        if "@" in to:
-                            msg = self.gmail.attach_to_message(msg, resp.content, attachment_name, attach.ATTACHMENT_TYPE)
-                        else:
-                            temp_address = f'{self.cfg.root}/out/tmp{self.ending}'
-                            if os.path.exists(temp_address):
-                                os.remove(temp_address)
-                            with open(f'{self.cfg.root}/out/tmp.pdf', 'wb') as f:
-                                f.write(resp.content)
-                            self.chat.upload(attachment_name, f'{self.cfg.root}/out/report.pdf')
+                        msg = self.gmail.attach_to_message(msg, resp.content, attachment_name, attach.ATTACHMENT_TYPE)
 
                 if email.MERGE_ATTACHMENTS == 'merge':
                     if os.path.exists(f'{self.cfg.root}/out/report.pdf'):
@@ -114,18 +101,12 @@ class Driver:
                     for f in glob.glob(f"{self.cfg.root}/out/tmp_*.pdf"):
                         os.remove(f)
 
-                    if "@" in to:
-                        with open(f'{self.cfg.root}/out/report.pdf', 'rb') as f:
-                            msg = self.gmail.attach_to_message(msg, f.read(), "report.pdf", "pdf")
-                    else:
-                        self.chat.upload(attachment_name, f"./report.pdf")
+                    with open(f'{self.cfg.root}/out/report.pdf', 'rb') as f:
+                        msg = self.gmail.attach_to_message(msg, f.read(), "report.pdf", "pdf")
 
-                if "@" in to:
-                    self.gmail.send_email(to, msg.as_string())
-                    print(f"Sent email: {email.EMAIL_ID} in {email.MODE} mode on {to}")
-                else:
-                    self.chat.share_to_gchat(to, txt)
-                    print(f"Sent chat: {email.EMAIL_ID} in {email.MODE} mode to space {to}")
+                # always send email now
+                self.gmail.send_email(to, msg.as_string())
+                print(f"Sent email: {email.EMAIL_ID} in {email.MODE} mode on {to}")
 
         return 0
 
