@@ -2,7 +2,7 @@ requests
 google-auth-httplib2
 PyPDF2
 pytz
-tableauserverclient
+tableauserverclient==0.38
 google-api-python-client
 google-auth
 unidecode
